@@ -81,6 +81,13 @@ export const robot = (app: Probot) => {
 
       let { files: changedFiles, commits } = data.data;
 
+      const ignoreList = (process.env.IGNORE || process.env.ignore || '')
+        .split('\n')
+        .filter((v) => v !== '');
+
+      const ignorePatterns = (process.env.IGNORE_PATTERNS || '').split(',')
+        .filter(pattern => pattern !== '');
+
       if (context.payload.action === 'synchronize' && commits.length >= 2) {
         const {
           data: { files },
@@ -91,31 +98,17 @@ export const robot = (app: Probot) => {
           head: commits[commits.length - 1].sha,
         });
 
-        const ignoreList = (process.env.IGNORE || process.env.ignore || '')
-          .split('\n')
-          .filter((v) => v !== '');
-
-          const ignorePatterns = (process.env.IGNORE_PATTERNS || '').split(',')
-
         const filesNames = files?.map((file) => file.filename) || [];
         changedFiles = changedFiles?.filter(
-          (file) => {
-            console.log(file.raw_url)
-            console.log(file.filename)
-            console.log(filesNames.includes(file.filename), !ignoreList.includes(file.filename), !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename)))
-            console.log(
-              filesNames.includes(file.filename),
-              !ignoreList.includes(file.filename),
-              !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename))
-            )
-
-            return filesNames.includes(file.filename) &&
-            !ignoreList.includes(file.filename) &&
-            !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename))
-
-          }
+          (file) => filesNames.includes(file.filename)
         );
       }
+
+      changedFiles = changedFiles?.filter(
+        (file) =>
+          !ignoreList.includes(file.filename) &&
+          !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename))
+      );
 
       if (!changedFiles?.length) {
         console.log('no change found');
