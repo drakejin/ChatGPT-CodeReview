@@ -100,6 +100,8 @@ export const robot = (app: Probot) => {
         const filesNames = files?.map((file) => file.filename) || [];
         changedFiles = changedFiles?.filter(
           (file) => {
+            console.log(file.raw_url)
+            console.log(file.filename)
             console.log(filesNames.includes(file.filename), !ignoreList.includes(file.filename), !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename)))
             console.log(
               filesNames.includes(file.filename),
