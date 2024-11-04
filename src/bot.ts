@@ -95,14 +95,23 @@ export const robot = (app: Probot) => {
           .split('\n')
           .filter((v) => v !== '');
 
-        const ignorePatterns = (process.env.IGNORE_PATTERNS || '').split(',')
+          const ignorePatterns = (process.env.IGNORE_PATTERNS || '').split(',')
 
         const filesNames = files?.map((file) => file.filename) || [];
         changedFiles = changedFiles?.filter(
-          (file) =>
-            filesNames.includes(file.filename) &&
+          (file) => {
+            console.log(filesNames.includes(file.filename), !ignoreList.includes(file.filename), !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename)))
+            console.log(
+              filesNames.includes(file.filename),
+              !ignoreList.includes(file.filename),
+              !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename))
+            )
+
+            return filesNames.includes(file.filename) &&
             !ignoreList.includes(file.filename) &&
             !ignorePatterns.some(pattern => new RegExp(pattern).test(file.filename))
+
+          }
         );
       }
 
@@ -112,6 +121,8 @@ export const robot = (app: Probot) => {
       }
 
       console.time('gpt cost');
+
+      const ress = [];
 
       for (let i = 0; i < changedFiles.length; i++) {
         const file = changedFiles[i];
@@ -129,21 +140,29 @@ export const robot = (app: Probot) => {
         }
         try {
           const res = await chat?.codeReview(patch);
-
           if (!!res) {
-            await context.octokit.pulls.createReviewComment({
-              repo: repo.repo,
-              owner: repo.owner,
-              pull_number: context.pullRequest().pull_number,
-              commit_id: commits[commits.length - 1].sha,
+            ress.push({
               path: file.filename,
               body: res,
               position: patch.split('\n').length - 1,
-            });
+            })
           }
         } catch (e) {
           console.error(`review ${file.filename} failed`, e);
         }
+      }
+      try {
+        await context.octokit.pulls.createReview({
+          repo: repo.repo,
+          owner: repo.owner,
+          pull_number: context.pullRequest().pull_number,
+          body: "Code review by ChatGPT",
+          event: 'COMMENT',
+          commit_id: commits[commits.length - 1].sha,
+          comments: ress,
+        });
+      } catch (e) {
+        console.error(`Failed to create review`, e);
       }
 
       console.timeEnd('gpt cost');
